@@ -2,7 +2,9 @@ name: liff
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
+    tags: ["v*.*.*"] # paths below aren't evaluated for tag pushes — a
+    # version tag always runs the full pipeline regardless of what changed
     paths:
       - services/liff/**
       - internal/**
