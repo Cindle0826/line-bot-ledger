@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const LINE_VERIFT_URL = "https://api.line.me/oauth2/v2.1/verify"
+const lineVerifyURL = "https://api.line.me/oauth2/v2.1/verify"
 
 // lineVerifier verifies LIFF ID tokens against LINE's own verify endpoint —
 // https://developers.line.biz/en/reference/line-login/#verify-id-token.
@@ -28,7 +28,7 @@ func newLineVerifier(channelID string) *lineVerifier {
 
 func (v *lineVerifier) VerifyIDToken(ctx context.Context, idToken string) (string, error) {
 	form := url.Values{"id_token": {idToken}, "client_id": {v.channelID}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, LINE_VERIFT_URL, strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, lineVerifyURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("lineauth: build verify request: %w", err)
 	}
@@ -38,7 +38,7 @@ func (v *lineVerifier) VerifyIDToken(ctx context.Context, idToken string) (strin
 	if err != nil {
 		return "", fmt.Errorf("lineauth: verify id token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("lineauth: verify id token: status %d", resp.StatusCode)
