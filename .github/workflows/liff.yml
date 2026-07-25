@@ -13,15 +13,11 @@ on:
       - go.sum
       - .github/workflows/liff.yml
       - .github/workflows/service-ci.yml
-  pull_request:
-    paths:
-      - services/liff/**
-      - internal/**
-      - deploy/liff/**
-      - go.mod
-      - go.sum
-      - .github/workflows/liff.yml
-      - .github/workflows/service-ci.yml
+  # No paths filter here: this is a required status check for merging into
+  # main, so it must run on every PR — a docs-only PR would otherwise never
+  # trigger it and the "required" check would sit pending forever, blocking
+  # the merge with nothing able to satisfy it.
+  pull_request: {}
 
 jobs:
   ci:
