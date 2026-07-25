@@ -40,9 +40,9 @@ variable "liff_image" {
 }
 
 variable "github_repository" {
-  description = "GitHub \"owner/repo\" trusted by Workload Identity Federation (github_actions.tf) to deploy from. Only workflow runs from this exact repo can impersonate the deployer service account."
+  description = "GitHub \"owner/repo\" trusted by Workload Identity Federation (github_actions.tf) to deploy from. Only workflow runs from this exact repo can impersonate the deployer service account. Case-sensitive — GitHub's OIDC token's assertion.repository claim preserves the account's actual casing (\"Cindle0826\", not \"cindle0826\"), and the attribute_condition comparison is a case-sensitive string match."
   type        = string
-  default     = "cindle0826/line-bot-ledger"
+  default     = "Cindle0826/line-bot-ledger"
 }
 
 variable "line_login_channel_id" {
