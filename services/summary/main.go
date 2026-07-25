@@ -30,7 +30,7 @@ func main() {
 	h := newSummaryHandler(b.Store, b.Bot)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/run", h.run)
-	mux.HandleFunc("/healthz", base.Healthz)
+	mux.HandleFunc("/status", base.Healthz)
 
 	slog.Info("listening", "port", b.Cfg.Port)
 	if err := http.ListenAndServe(":"+b.Cfg.Port, mux); err != nil {

@@ -92,17 +92,17 @@ curl -s -X POST https://summary-dev.你的domain.com/run
 本機健康檢查
 
 ```bash
-curl -s http://localhost:8080/healthz
-curl -s http://localhost:8081/healthz
-curl -s http://localhost:8082/healthz
+curl -s http://localhost:8080/status
+curl -s http://localhost:8081/status
+curl -s http://localhost:8082/status
 ```
 
 外部健康檢查（經過 tunnel）
 
 ```bash
-curl -s https://webhook-dev.你的domain.com/healthz
-curl -s https://liff-dev.你的domain.com/healthz
-curl -s https://summary-dev.你的domain.com/healthz
+curl -s https://webhook-dev.你的domain.com/status
+curl -s https://liff-dev.你的domain.com/status
+curl -s https://summary-dev.你的domain.com/status
 ```
 
 Firestore 資源還沒 apply 之前，webhook 回「記帳失敗，請稍後再試」屬正常。

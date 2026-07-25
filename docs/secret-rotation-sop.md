@@ -22,7 +22,7 @@
 4. 更新本機 `.env` 裡對應的值(本機開發用,跟 Secret Manager 是分開的兩份副本,不會自動同步)
 5. 確認新 revision 正常:
    ```bash
-   curl -s https://<服務網址>/healthz
+   curl -s https://<服務網址>/status
    ```
 6. （可選)舊版本不用手動刪除——Secret Manager 免費額度是 6 個 active version,超過再清
 

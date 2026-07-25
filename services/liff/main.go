@@ -71,7 +71,7 @@ func main() {
 	mux.HandleFunc("DELETE /liff/entries/{id}", h.deleteEntry)
 	mux.HandleFunc("GET /liff/settings", h.getSettings)
 	mux.HandleFunc("POST /liff/settings", h.updateSettings)
-	mux.HandleFunc("/healthz", base.Healthz)
+	mux.HandleFunc("/status", base.Healthz)
 
 	slog.Info("listening", "port", b.Cfg.Port)
 	if err := http.ListenAndServe(":"+b.Cfg.Port, mux); err != nil {

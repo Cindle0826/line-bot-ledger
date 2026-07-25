@@ -31,7 +31,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/callback", newWebhookHandler(channelSecret, b.Bot, b.Store))
-	mux.HandleFunc("/healthz", base.Healthz)
+	mux.HandleFunc("/status", base.Healthz)
 
 	slog.Info("listening", "port", b.Cfg.Port)
 	if err := http.ListenAndServe(":"+b.Cfg.Port, mux); err != nil {
