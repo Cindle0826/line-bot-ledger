@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>記一筆</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 24px 20px 32px;
+    background: #f4f5f3;
+    color: #1a1a1a;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px 20px 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .header .title { display: flex; align-items: center; gap: 10px; }
+  .header .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #e7f8ee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .header h1 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .header nav { display: flex; gap: 12px; }
+  .header a {
+    font-size: 13px;
+    color: #06C755;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a8a86;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  select, input[type="number"], input[type="text"] {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    border: 1.5px solid #e5e5e2;
+    border-radius: 12px;
+    font-size: 16px;
+    background: #fafaf9;
+    color: #1a1a1a;
+    transition: border-color 0.15s, background 0.15s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+  select:focus, input:focus {
+    outline: none;
+    border-color: #06C755;
+    background: #fff;
+  }
+  .sign-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    background: #f0f0ee;
+    padding: 4px;
+    border-radius: 12px;
+  }
+  .sign-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .sign-toggle label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b6b67;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .sign-toggle input:checked + label {
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+  .sign-toggle input[value="-1"]:checked + label { color: #d64545; }
+  .sign-toggle input[value="1"]:checked + label { color: #0f9d58; }
+  button {
+    width: 100%;
+    height: 48px;
+    background: #06C755;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 4px;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  button:active { transform: scale(0.98); }
+  button:disabled { background: #d4d4d1; }
+  #status {
+    font-size: 13px;
+    margin: 14px 0 0;
+    text-align: center;
+    min-height: 18px;
+    color: #8a8a86;
+  }
+  #status.error { color: #d64545; }
+  #status.success { color: #0f9d58; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="title">
+        <div class="icon">🦉</div>
+        <h1>記一筆</h1>
+      </div>
+      <nav>
+        <a href="/history">歷史</a>
+        <a href="/settings">設定</a>
+      </nav>
+    </div>
+
+    <form id="entry-form">
+      <div class="field">
+        <label>類型</label>
+        <div class="sign-toggle">
+          <input type="radio" name="sign" value="-1" id="sign-expense" checked />
+          <label for="sign-expense">支出</label>
+          <input type="radio" name="sign" value="1" id="sign-income" />
+          <label for="sign-income">收入</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="category">類別</label>
+        <select id="category">
+          <option>午餐</option>
+          <option>交通</option>
+          <option>娛樂</option>
+          <option>其他</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="amount">金額</label>
+        <input id="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="100" required />
+      </div>
+
+      <div class="field" style="margin-bottom: 0;">
+        <label for="note">備註（選填）</label>
+        <input id="note" type="text" placeholder="便當" />
+      </div>
+
+      <button id="submit-btn" type="submit">送出記帳</button>
+      <p id="status"></p>
+    </form>
+  </div>
+
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+const statusEl = document.getElementById('status');
+const btn = document.getElementById('submit-btn');
+const liffId = {{.LiffID}};
+
+function setStatus(text, kind) {
+  statusEl.textContent = text;
+  statusEl.className = kind || '';
+}
+
+async function init() {
+  if (!liffId) {
+    setStatus('伺服器還沒設定 LIFF_ID', 'error');
+    btn.disabled = true;
+    return;
+  }
+  try {
+    await liff.init({ liffId: liffId });
+    if (!liff.isLoggedIn()) {
+      liff.login();
+    }
+  } catch (e) {
+    setStatus('初始化失敗：' + e.message, 'error');
+    btn.disabled = true;
+  }
+}
+
+document.getElementById('entry-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const sign = parseFloat(document.querySelector('input[name="sign"]:checked').value);
+  const rawAmount = parseFloat(document.getElementById('amount').value);
+  const category = document.getElementById('category').value;
+  const note = document.getElementById('note').value;
+  if (!rawAmount) {
+    setStatus('請輸入金額', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus('送出中...');
+  try {
+    const idToken = liff.getIDToken();
+    const res = await fetch('/liff/entries', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + idToken,
+      },
+      body: JSON.stringify({ amount: sign * Math.abs(rawAmount), category: category, note: note }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setStatus('已記錄 ✓', 'success');
+    document.getElementById('entry-form').reset();
+  } catch (err) {
+    setStatus('記帳失敗：' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Local-only variant for `docker build`/`docker run` sanity checks on your
+# own machine. No --platform pin, so it builds for whatever architecture
+# Docker is running natively (arm64 on Apple Silicon) — fast, no QEMU
+# emulation. This is NOT what gets deployed: deploy/webhook/Dockerfile
+# (pinned to linux/amd64) is what .github/workflows/webhook.yml builds and
+# pushes to Cloud Run.
+FROM golang:1.25 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/server ./services/webhook
+
+FROM gcr.io/distroless/static-debian12
+COPY --from=build /out/server /server
+ENTRYPOINT ["/server"]

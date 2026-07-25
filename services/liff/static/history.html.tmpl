@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>記帳歷史</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 24px 20px 32px;
+    background: #f4f5f3;
+    color: #1a1a1a;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px 20px 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    margin-bottom: 16px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .header h1 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .header nav { display: flex; gap: 12px; }
+  .header a {
+    font-size: 13px;
+    color: #06C755;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a8a86;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  select, input[type="date"] {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    border: 1.5px solid #e5e5e2;
+    border-radius: 12px;
+    font-size: 15px;
+    background: #fafaf9;
+    color: #1a1a1a;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  select:focus, input:focus { outline: none; border-color: #06C755; background: #fff; }
+  .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .sign-toggle {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    background: #f0f0ee;
+    padding: 4px;
+    border-radius: 12px;
+  }
+  .sign-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .sign-toggle label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b6b67;
+    cursor: pointer;
+  }
+  .sign-toggle input:checked + label { background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); color: #1a1a1a; }
+  button {
+    width: 100%;
+    height: 46px;
+    background: #06C755;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  button:disabled { background: #d4d4d1; }
+  #status { font-size: 13px; margin: 10px 0 0; text-align: center; color: #8a8a86; }
+  #status.error { color: #d64545; }
+
+  .total-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .total-row .label { font-size: 13px; color: #8a8a86; }
+  .total-row .value { font-size: 22px; font-weight: 600; }
+  .cat-row { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid #f0f0ee; font-size: 14px; }
+  .cat-row:first-of-type { border-top: none; }
+
+  .entry-row { padding: 10px 0; border-top: 1px solid #f0f0ee; }
+  .entry-row:first-child { border-top: none; }
+  .entry-row .top { display: flex; justify-content: space-between; font-size: 14px; }
+  .entry-row .category { font-weight: 600; }
+  .pos { color: #0f9d58; }
+  .neg { color: #d64545; }
+  .entry-row .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+  .entry-row .meta-text { font-size: 12px; color: #8a8a86; }
+  .entry-row .row-actions { display: flex; gap: 12px; }
+  .entry-row .row-actions button {
+    all: unset;
+    font-size: 12px;
+    font-weight: 600;
+    color: #06C755;
+    cursor: pointer;
+  }
+  .entry-row .row-actions button.danger { color: #d64545; }
+  .empty { font-size: 13px; color: #8a8a86; text-align: center; padding: 12px 0; }
+
+  .edit-form { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e5e2; }
+  .edit-form.open { display: block; }
+  .edit-form .edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .edit-form select, .edit-form input {
+    width: 100%;
+    height: 38px;
+    padding: 0 10px;
+    border: 1.5px solid #e5e5e2;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fafaf9;
+    color: #1a1a1a;
+  }
+  .edit-form .edit-actions { display: flex; gap: 8px; }
+  .edit-form .edit-actions button {
+    all: unset;
+    flex: 1;
+    text-align: center;
+    height: 36px;
+    line-height: 36px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .edit-form .save-btn { background: #06C755; color: #fff; }
+  .edit-form .cancel-btn { background: #f0f0ee; color: #6b6b67; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>記帳歷史</h1>
+      <nav>
+        <a href="/">← 記一筆</a>
+        <a href="/settings">設定</a>
+      </nav>
+    </div>
+
+    <form id="filter-form">
+      <div class="field">
+        <label>類型</label>
+        <div class="sign-toggle">
+          <input type="radio" name="sign" value="" id="sign-all" checked />
+          <label for="sign-all">全部</label>
+          <input type="radio" name="sign" value="expense" id="sign-expense" />
+          <label for="sign-expense">支出</label>
+          <input type="radio" name="sign" value="income" id="sign-income" />
+          <label for="sign-income">收入</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="category">類別</label>
+        <select id="category">
+          <option value="">全部</option>
+          <option>午餐</option>
+          <option>交通</option>
+          <option>娛樂</option>
+          <option>其他</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>日期區間</label>
+        <div class="date-row">
+          <input type="date" id="from" />
+          <input type="date" id="to" />
+        </div>
+      </div>
+
+      <button id="query-btn" type="submit">查詢</button>
+      <p id="status"></p>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="total-row">
+      <span class="label">總計</span>
+      <span class="value" id="grand-total">—</span>
+    </div>
+    <div id="category-breakdown"></div>
+  </div>
+
+  <div class="card">
+    <div id="entry-list"></div>
+  </div>
+
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+const statusEl = document.getElementById('status');
+const btn = document.getElementById('query-btn');
+const liffId = {{.LiffID}};
+
+function setStatus(text, kind) {
+  statusEl.textContent = text || '';
+  statusEl.className = kind || '';
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function fmtAmount(n) {
+  const sign = n > 0 ? '+' : '';
+  return sign + Math.round(n).toLocaleString();
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : String(s);
+  return div.innerHTML;
+}
+
+function renderResults(data) {
+  const totalEl = document.getElementById('grand-total');
+  totalEl.textContent = fmtAmount(data.total);
+  totalEl.className = 'value ' + (data.total >= 0 ? 'pos' : 'neg');
+
+  const breakdown = document.getElementById('category-breakdown');
+  breakdown.innerHTML = '';
+  if (!data.categories || data.categories.length === 0) {
+    breakdown.innerHTML = '<p class="empty">這個區間沒有資料</p>';
+  } else {
+    for (const c of data.categories) {
+      const row = document.createElement('div');
+      row.className = 'cat-row';
+      row.innerHTML = '<span>' + c.category + '</span><span class="' + (c.total >= 0 ? 'pos' : 'neg') + '">' + fmtAmount(c.total) + '</span>';
+      breakdown.appendChild(row);
+    }
+  }
+
+  const list = document.getElementById('entry-list');
+  list.innerHTML = '';
+  if (!data.entries || data.entries.length === 0) {
+    list.innerHTML = '<p class="empty">沒有符合條件的紀錄</p>';
+    return;
+  }
+
+  const categoryOptions = Array.from(document.getElementById('category').options)
+    .filter(o => o.value)
+    .map(o => '<option>' + escapeHtml(o.value) + '</option>')
+    .join('');
+
+  for (const e of data.entries.slice().reverse()) {
+    const row = document.createElement('div');
+    row.className = 'entry-row';
+    row.dataset.id = e.id;
+    const date = new Date(e.createdAt);
+    const dateStr = date.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    row.innerHTML =
+      '<div class="top"><span class="category">' + escapeHtml(e.category) + '</span>' +
+      '<span class="amount ' + (e.amount >= 0 ? 'pos' : 'neg') + '">' + fmtAmount(e.amount) + '</span></div>' +
+      '<div class="meta">' +
+        '<span class="meta-text">' + dateStr + (e.note ? '　' + escapeHtml(e.note) : '') + '</span>' +
+        '<span class="row-actions"><button type="button" class="edit-btn">編輯</button><button type="button" class="danger delete-btn">刪除</button></span>' +
+      '</div>' +
+      '<div class="edit-form">' +
+        '<div class="edit-row">' +
+          '<select class="edit-category">' + categoryOptions + '</select>' +
+          '<input class="edit-amount" type="number" inputmode="numeric" step="1" value="' + e.amount + '" />' +
+        '</div>' +
+        '<input class="edit-note" type="text" placeholder="備註（選填）" value="' + escapeHtml(e.note || '') + '" style="margin-bottom:8px;" />' +
+        '<div class="edit-actions">' +
+          '<button type="button" class="cancel-btn">取消</button>' +
+          '<button type="button" class="save-btn">儲存</button>' +
+        '</div>' +
+      '</div>';
+    row.querySelector('.edit-category').value = e.category;
+    list.appendChild(row);
+  }
+}
+
+async function saveEntry(row) {
+  const id = row.dataset.id;
+  const amount = parseFloat(row.querySelector('.edit-amount').value);
+  const category = row.querySelector('.edit-category').value;
+  const note = row.querySelector('.edit-note').value;
+  if (!amount) {
+    setStatus('請輸入金額', 'error');
+    return;
+  }
+  try {
+    const idToken = liff.getIDToken();
+    const res = await fetch('/liff/entries/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+      body: JSON.stringify({ amount: amount, category: category, note: note }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setStatus('');
+    loadResults();
+  } catch (err) {
+    setStatus('更新失敗：' + err.message, 'error');
+  }
+}
+
+async function deleteEntry(row) {
+  if (!confirm('確定要刪除這筆記錄嗎？')) return;
+  const id = row.dataset.id;
+  try {
+    const idToken = liff.getIDToken();
+    const res = await fetch('/liff/entries/' + id, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + idToken },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setStatus('');
+    loadResults();
+  } catch (err) {
+    setStatus('刪除失敗：' + err.message, 'error');
+  }
+}
+
+document.getElementById('entry-list').addEventListener('click', (e) => {
+  const row = e.target.closest('.entry-row');
+  if (!row) return;
+  if (e.target.classList.contains('edit-btn')) {
+    row.querySelector('.edit-form').classList.add('open');
+  } else if (e.target.classList.contains('cancel-btn')) {
+    row.querySelector('.edit-form').classList.remove('open');
+  } else if (e.target.classList.contains('save-btn')) {
+    saveEntry(row);
+  } else if (e.target.classList.contains('delete-btn')) {
+    deleteEntry(row);
+  }
+});
+
+async function loadResults() {
+  btn.disabled = true;
+  setStatus('查詢中...');
+  try {
+    const params = new URLSearchParams();
+    const sign = document.querySelector('input[name="sign"]:checked').value;
+    const category = document.getElementById('category').value;
+    const from = document.getElementById('from').value;
+    const to = document.getElementById('to').value;
+    if (sign) params.set('sign', sign);
+    if (category) params.set('category', category);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+
+    const idToken = liff.getIDToken();
+    const res = await fetch('/liff/entries?' + params.toString(), {
+      headers: { 'Authorization': 'Bearer ' + idToken },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    renderResults(await res.json());
+    setStatus('');
+  } catch (err) {
+    setStatus('查詢失敗：' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function init() {
+  if (!liffId) {
+    setStatus('伺服器還沒設定 LIFF_ID', 'error');
+    btn.disabled = true;
+    return;
+  }
+  try {
+    await liff.init({ liffId: liffId });
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+  } catch (e) {
+    setStatus('初始化失敗：' + e.message, 'error');
+    btn.disabled = true;
+    return;
+  }
+
+  const today = todayStr();
+  document.getElementById('from').value = today;
+  document.getElementById('to').value = today;
+  loadResults();
+}
+
+document.getElementById('filter-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  loadResults();
+});
+
+init();
+</script>
+</body>
+</html>

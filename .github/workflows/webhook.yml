@@ -1,0 +1,110 @@
+name: webhook
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/webhook/**
+      - internal/**
+      - deploy/webhook/**
+      - go.mod
+      - go.sum
+      - .github/workflows/webhook.yml
+  pull_request:
+    paths:
+      - services/webhook/**
+      - internal/**
+      - deploy/webhook/**
+      - go.mod
+      - go.sum
+      - .github/workflows/webhook.yml
+
+env:
+  GCP_PROJECT_ID: line-bot-503410
+  GCP_REGION: asia-east1
+  CLOUD_RUN_SERVICE: ledger-webhook
+  IMAGE: asia-east1-docker.pkg.dev/line-bot-503410/line-bot-ledger/webhook
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v6
+
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: govulncheck ./...
+
+  deploy:
+    # Only deploy on a real push to main — PRs just get the checks above.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, lint, vulncheck]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for Workload Identity Federation
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO(yihao): GCP_WORKLOAD_IDENTITY_PROVIDER and
+      # GCP_SERVICE_ACCOUNT_EMAIL don't exist as repo secrets yet — this job
+      # will fail auth until you set them up. You need, in GCP:
+      #   1. A Workload Identity Pool + Provider trusting this GitHub repo
+      #      (no long-lived JSON key to manage/rotate).
+      #   2. A service account with roles/artifactregistry.writer and
+      #      roles/run.developer on this project, bound to that provider.
+      # Then in GitHub: repo Settings -> Secrets and variables -> Actions,
+      # add GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT_EMAIL.
+      # None of this is created by this workflow file — it's just wired to
+      # expect it.
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Cloud Run only runs linux/amd64 images. ubuntu-latest runners are
+      # already amd64, so this needs no QEMU emulation.
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/webhook/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.CLOUD_RUN_SERVICE }}
+          region: ${{ env.GCP_REGION }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          image: ${{ env.IMAGE }}:${{ github.sha }}

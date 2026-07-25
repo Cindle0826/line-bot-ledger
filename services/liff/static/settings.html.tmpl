@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>訂閱設定</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 24px 20px 32px;
+    background: #f4f5f3;
+    color: #1a1a1a;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px 20px 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    margin-bottom: 16px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .header h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  .header nav { display: flex; gap: 12px; }
+  .header a { font-size: 13px; color: #06C755; text-decoration: none; font-weight: 600; }
+  .hint { font-size: 13px; color: #8a8a86; margin: 0 0 18px; line-height: 1.5; }
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 4px;
+    border-top: 1px solid #f0f0ee;
+    cursor: pointer;
+  }
+  .option:first-of-type { border-top: none; }
+  .option input {
+    width: 20px;
+    height: 20px;
+    accent-color: #06C755;
+  }
+  .option .label { font-size: 15px; font-weight: 600; }
+  .option .desc { font-size: 12px; color: #8a8a86; margin-top: 2px; }
+  button {
+    width: 100%;
+    height: 48px;
+    background: #06C755;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 18px;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  button:active { transform: scale(0.98); }
+  button:disabled { background: #d4d4d1; }
+  #status { font-size: 13px; margin: 14px 0 0; text-align: center; min-height: 18px; color: #8a8a86; }
+  #status.error { color: #d64545; }
+  #status.success { color: #0f9d58; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>訂閱設定</h1>
+      <nav>
+        <a href="/">← 記一筆</a>
+        <a href="/history">歷史</a>
+      </nav>
+    </div>
+    <p class="hint">選擇要接收的記帳總結頻率，可以複選。每日總結每天都會收到；每週／每月則分別在週一、月初收到上一個週期的總結。</p>
+
+    <form id="settings-form">
+      <label class="option">
+        <input type="checkbox" name="freq" value="daily" />
+        <div>
+          <div class="label">每日總結</div>
+          <div class="desc">每天推播當天的分類小計</div>
+        </div>
+      </label>
+      <label class="option">
+        <input type="checkbox" name="freq" value="weekly" />
+        <div>
+          <div class="label">每週總結</div>
+          <div class="desc">每週一推播上一週（一到日）的分類小計</div>
+        </div>
+      </label>
+      <label class="option">
+        <input type="checkbox" name="freq" value="monthly" />
+        <div>
+          <div class="label">每月總結</div>
+          <div class="desc">每月 1 號推播上個月的分類小計</div>
+        </div>
+      </label>
+
+      <button id="save-btn" type="submit">儲存</button>
+      <p id="status"></p>
+    </form>
+  </div>
+
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+const statusEl = document.getElementById('status');
+const btn = document.getElementById('save-btn');
+const liffId = {{.LiffID}};
+
+function setStatus(text, kind) {
+  statusEl.textContent = text || '';
+  statusEl.className = kind || '';
+}
+
+function checkboxFor(freq) {
+  return document.querySelector('input[name="freq"][value="' + freq + '"]');
+}
+
+async function loadSettings() {
+  const idToken = liff.getIDToken();
+  const res = await fetch('/liff/settings', {
+    headers: { 'Authorization': 'Bearer ' + idToken },
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  for (const freq of (data.subscriptions || [])) {
+    const cb = checkboxFor(freq);
+    if (cb) cb.checked = true;
+  }
+}
+
+document.getElementById('settings-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const subscriptions = Array.from(document.querySelectorAll('input[name="freq"]:checked')).map(cb => cb.value);
+
+  btn.disabled = true;
+  setStatus('儲存中...');
+  try {
+    const idToken = liff.getIDToken();
+    const res = await fetch('/liff/settings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + idToken,
+      },
+      body: JSON.stringify({ subscriptions: subscriptions }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setStatus('已儲存 ✓', 'success');
+  } catch (err) {
+    setStatus('儲存失敗：' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function init() {
+  if (!liffId) {
+    setStatus('伺服器還沒設定 LIFF_ID', 'error');
+    btn.disabled = true;
+    return;
+  }
+  try {
+    await liff.init({ liffId: liffId });
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+    await loadSettings();
+  } catch (e) {
+    setStatus('初始化失敗：' + e.message, 'error');
+    btn.disabled = true;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Secrets — never commit
+.env
+
+# Personal working notes for Claude Code — not meant for the repo
+CLAUDE.md
+
+# macOS
+.DS_Store
+
+# Terraform (also see infrastruct_as_code/terraform/.gitignore)
+infrastruct_as_code/terraform/.terraform/
+infrastruct_as_code/terraform/terraform.tfvars
+infrastruct_as_code/terraform/*.tfstate
+infrastruct_as_code/terraform/*.tfstate.*

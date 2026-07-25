@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>line-bot-ledger — Architecture</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #dcdcd6;
+    --text: #1f1f1d;
+    --muted: #6b6b64;
+    --accent: #06c755;      /* LINE green */
+    --accent-ink: #04331d;
+    --gcp-blue: #4285f4;
+    --gcp-blue-ink: #0b2a63;
+    --gcp-orange: #f9ab00;
+    --gcp-orange-ink: #5c3d00;
+    --gh-purple: #6e40c9;
+    --arrow: #9a9a92;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --surface: #201f1d;
+      --border: #3a3a36;
+      --text: #ece9e2;
+      --muted: #a5a29a;
+      --arrow: #6f6d66;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614; --surface: #201f1d; --border: #3a3a36; --text: #ece9e2; --muted: #a5a29a; --arrow: #6f6d66;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f7f5; --surface: #ffffff; --border: #dcdcd6; --text: #1f1f1d; --muted: #6b6b64; --arrow: #9a9a92;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    padding: 40px 24px 64px;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin: 0 0 32px; }
+
+  .diagram-scroll { overflow-x: auto; padding-bottom: 8px; }
+  svg { display: block; min-width: 1150px; }
+
+  .box {
+    fill: var(--surface);
+    stroke: var(--border);
+    stroke-width: 1;
+    rx: 10;
+  }
+  .box-title { font-size: 13px; font-weight: 600; fill: var(--text); }
+  .box-sub { font-size: 10.5px; fill: var(--muted); }
+  .badge { font-size: 9.5px; font-weight: 600; letter-spacing: .03em; }
+  .lane-label { font-size: 10.5px; fill: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .section-label { font-size: 11.5px; fill: var(--text); font-weight: 600; }
+
+  .edge { stroke: var(--arrow); stroke-width: 1.4; fill: none; }
+  .edge-label { font-size: 10.5px; fill: var(--muted); }
+
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 28px; font-size: 12.5px; color: var(--muted); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .notes {
+    margin-top: 32px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card h3 { font-size: 13px; margin: 0 0 8px; }
+  .card p, .card li { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin: 0; }
+  .card ul { margin: 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>line-bot-ledger — 系統架構圖</h1>
+  <p class="subtitle">三個獨立 Cloud Run 服務（services/webhook 記帳、services/liff 記帳表單、services/summary 每日總結）+ LINE Messaging API/LIFF + Firestore（個人記帳練習專案）</p>
+
+  <div class="diagram-scroll">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+
+    <text x="20" y="28" class="lane-label">使用者端</text>
+    <text x="300" y="28" class="lane-label">LINE 平台</text>
+    <text x="600" y="28" class="lane-label">GCP 運算 — asia-east1</text>
+    <text x="900" y="28" class="lane-label">GCP 資料 / 機密 — asia-east1</text>
+
+    <text x="20" y="48" class="section-label">① 即時記帳（LINE 文字訊息 → services/webhook → Firestore）</text>
+    <text x="20" y="203" class="section-label">② 記帳表單（LIFF → services/liff → Firestore）</text>
+    <text x="20" y="368" class="section-label">③ 每日總結（Cloud Scheduler → services/summary → Firestore → LINE Push）</text>
+
+    <!-- ① LINE User -->
+    <rect class="box" x="20" y="65" width="150" height="70"/>
+    <text x="40" y="95" class="box-title">LINE User</text>
+    <text x="40" y="113" class="box-sub">傳送記帳訊息</text>
+    <text x="40" y="127" class="box-sub">「-100 午餐」</text>
+
+    <!-- ① LINE Platform -->
+    <rect class="box" x="300" y="60" width="180" height="80" stroke="var(--accent)"/>
+    <text x="320" y="90" class="box-title">LINE Platform</text>
+    <text x="320" y="108" class="box-sub">Messaging API</text>
+    <rect x="320" y="115" width="68" height="14" rx="7" fill="var(--accent)"/>
+    <text x="327" y="125" class="badge" fill="var(--accent-ink)">WEBHOOK</text>
+    <rect x="394" y="115" width="50" height="14" rx="7" fill="var(--accent)"/>
+    <text x="402" y="125" class="badge" fill="var(--accent-ink)">PUSH</text>
+
+    <!-- ① Cloud Run webhook -->
+    <rect class="box" x="600" y="55" width="200" height="90" stroke="var(--gcp-blue)"/>
+    <text x="620" y="85" class="box-title">Cloud Run</text>
+    <text x="620" y="103" class="box-sub">services/webhook</text>
+    <text x="620" y="118" class="box-sub">min-instances = 0</text>
+    <rect x="620" y="125" width="140" height="14" rx="7" fill="var(--gcp-blue)"/>
+    <text x="628" y="135" class="badge" fill="#fff">POST /callback</text>
+
+    <!-- Secret Manager -->
+    <rect class="box" x="900" y="60" width="220" height="80" stroke="var(--gcp-orange)"/>
+    <text x="916" y="93" class="box-title" font-size="13">Secret Manager</text>
+    <text x="916" y="110" class="box-sub">LINE_CHANNEL_SECRET</text>
+    <text x="916" y="125" class="box-sub">LINE_CHANNEL_TOKEN（三服務共用）</text>
+
+    <!-- ② Browser User -->
+    <rect class="box" x="20" y="220" width="150" height="80" stroke="var(--accent)"/>
+    <text x="40" y="248" class="box-title">使用者瀏覽器</text>
+    <text x="40" y="266" class="box-sub">LINE 內建瀏覽器</text>
+    <text x="40" y="280" class="box-sub">開啟 LIFF 表單</text>
+    <rect x="40" y="286" width="80" height="14" rx="7" fill="var(--accent)"/>
+    <text x="47" y="296" class="badge" fill="var(--accent-ink)">LIFF</text>
+
+    <!-- ② Cloud Run liff -->
+    <rect class="box" x="600" y="215" width="200" height="90" stroke="var(--gcp-blue)"/>
+    <text x="620" y="245" class="box-title">Cloud Run</text>
+    <text x="620" y="263" class="box-sub">services/liff</text>
+    <text x="620" y="278" class="box-sub">驗證 LIFF ID Token</text>
+    <rect x="620" y="285" width="170" height="14" rx="7" fill="var(--gcp-blue)"/>
+    <text x="628" y="295" class="badge" fill="#fff">/liff/entries · /history</text>
+
+    <!-- Firestore (shared by all three services) -->
+    <rect class="box" x="900" y="260" width="220" height="220" stroke="var(--gcp-orange)"/>
+    <text x="916" y="292" class="box-title">Firestore</text>
+    <text x="916" y="310" class="box-sub">Native mode（免費額度）</text>
+    <text x="916" y="326" class="box-sub">users/{uid}/entries</text>
+    <rect x="916" y="334" width="60" height="14" rx="7" fill="var(--gcp-orange)"/>
+    <text x="924" y="344" class="badge" fill="#5c3d00">NOSQL</text>
+    <text x="916" y="466" class="box-sub" font-style="italic">三個服務共用同一份資料</text>
+
+    <!-- ③ Cloud Scheduler -->
+    <rect class="box" x="600" y="385" width="200" height="80" stroke="var(--gcp-blue)"/>
+    <text x="620" y="413" class="box-title">Cloud Scheduler</text>
+    <text x="620" y="431" class="box-sub">cron：每日 22:00</text>
+    <rect x="620" y="437" width="110" height="14" rx="7" fill="var(--gcp-blue)"/>
+    <text x="628" y="447" class="badge" fill="#fff">CRON TRIGGER</text>
+
+    <!-- ③ Cloud Run summary -->
+    <rect class="box" x="600" y="540" width="200" height="90" stroke="var(--gcp-blue)"/>
+    <text x="620" y="570" class="box-title">Cloud Run</text>
+    <text x="620" y="588" class="box-sub">services/summary</text>
+    <text x="620" y="603" class="box-sub">min-instances = 0</text>
+    <rect x="620" y="610" width="110" height="14" rx="7" fill="var(--gcp-blue)"/>
+    <text x="628" y="620" class="badge" fill="#fff">POST /run</text>
+
+    <!-- CI/CD: GitHub Actions -->
+    <rect class="box" x="300" y="690" width="820" height="90" stroke-dasharray="4 3"/>
+    <text x="320" y="718" class="box-title" font-size="12.5">GitHub Actions（.github/workflows/*.yml，一服務一份）</text>
+    <text x="320" y="736" class="box-sub">push main → build linux/amd64 image → push Artifact Registry → deploy-cloudrun</text>
+    <rect x="320" y="746" width="150" height="14" rx="7" fill="var(--gh-purple)"/>
+    <text x="328" y="756" class="badge" fill="#fff">WORKLOAD IDENTITY</text>
+    <text x="490" y="756" class="box-sub">免長期金鑰，OIDC 換短效 token</text>
+
+    <!-- Arrows: ① 即時記帳 -->
+    <path class="edge" d="M170,100 L300,100" marker-end="url(#arrow)"/>
+    <text x="182" y="93" class="edge-label">傳訊息</text>
+
+    <path class="edge" d="M480,100 L600,100" marker-end="url(#arrow)"/>
+    <text x="488" y="93" class="edge-label">POST webhook event</text>
+
+    <path class="edge" d="M600,125 L480,125" marker-end="url(#arrow)" stroke-dasharray="3 3"/>
+    <text x="488" y="145" class="edge-label">Reply API 回覆</text>
+
+    <path class="edge" d="M300,125 L170,125" marker-end="url(#arrow)" stroke-dasharray="3 3"/>
+
+    <path class="edge" d="M900,100 L800,100" marker-end="url(#arrow)"/>
+    <text x="850" y="48" class="edge-label" text-anchor="middle">注入密鑰</text>
+
+    <path class="edge" d="M800,125 L855,125 L855,310 L900,310" marker-end="url(#arrow)"/>
+    <text x="862" y="215" class="edge-label">寫入記帳資料</text>
+
+    <!-- Arrows: ② 記帳表單 -->
+    <path class="edge" d="M170,260 L600,260" marker-end="url(#arrow)"/>
+    <text x="380" y="253" class="edge-label" text-anchor="middle">開啟表單／送出記帳（帶 ID Token）</text>
+
+    <path class="edge" d="M800,270 L855,270 L855,355 L900,355" marker-end="url(#arrow)"/>
+    <text x="862" y="378" class="edge-label">寫入記帳資料</text>
+
+    <!-- Arrows: ③ 每日總結 -->
+    <path class="edge" d="M700,465 L700,540" marker-end="url(#arrow)"/>
+    <text x="710" y="505" class="edge-label">每日觸發</text>
+
+    <path class="edge" d="M800,575 L855,575 L855,435 L900,435" marker-end="url(#arrow)"/>
+    <text x="862" y="500" class="edge-label">查詢記帳資料</text>
+
+    <path class="edge" d="M600,575 L540,575 L540,132 L480,132" marker-end="url(#arrow)"/>
+    <text x="534" y="170" class="edge-label" text-anchor="end">Push API 推播總結</text>
+
+    <!-- Arrows: CI/CD 部署（共用 x=560 垂直匯流排，分支進 webhook / liff；summary 走 x=650 直線） -->
+    <path class="edge" d="M600,700 L560,700 L560,125 L600,125" marker-end="url(#arrow)"/>
+    <text x="552" y="410" class="edge-label" text-anchor="end">部署 webhook</text>
+
+    <path class="edge" d="M560,700 L560,260 L600,260" marker-end="url(#arrow)"/>
+    <text x="552" y="620" class="edge-label" text-anchor="end">部署 liff</text>
+
+    <path class="edge" d="M700,690 L700,630" marker-end="url(#arrow)"/>
+    <text x="710" y="665" class="edge-label">部署 summary</text>
+
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--arrow)"/>
+      </marker>
+    </defs>
+  </svg>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="swatch" style="background:var(--accent)"></span> LINE 平台 / LIFF</div>
+    <div class="legend-item"><span class="swatch" style="background:var(--gcp-blue)"></span> 運算 / 觸發</div>
+    <div class="legend-item"><span class="swatch" style="background:var(--gcp-orange)"></span> 資料 / 機密</div>
+    <div class="legend-item"><span class="swatch" style="background:var(--gh-purple)"></span> CI/CD 身份</div>
+    <div class="legend-item"><span class="swatch" style="background:var(--border)"></span> CI/CD 流程（虛線框）</div>
+  </div>
+
+  <div class="notes">
+    <div class="card">
+      <h3>① 即時記帳流程</h3>
+      <ul>
+        <li>使用者在 LINE 傳送記帳訊息</li>
+        <li>LINE Platform 以 HTTPS POST 呼叫 <code>services/webhook</code> 的 <code>/callback</code></li>
+        <li>驗證 <code>X-Line-Signature</code>，用 <code>ledger.ParseMessage</code> 解析訊息</li>
+        <li>寫入 Firestore 記帳資料，透過 Reply API 回覆結果</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>② 記帳表單流程</h3>
+      <ul>
+        <li>使用者從好友歡迎訊息或連結開啟 LIFF 表單（LINE 內建瀏覽器直接載入 <code>services/liff</code>，不經過 Messaging API webhook）</li>
+        <li>每個請求都帶 LIFF ID Token，後端呼叫 LINE 的 <code>/oauth2/v2.1/verify</code> 驗證身份</li>
+        <li><code>POST /liff/entries</code> 新增一筆，跟 webhook 共用 <code>internal/store.AddEntry</code></li>
+        <li><code>/history</code> 是獨立頁面，呼叫 <code>GET /liff/entries</code> 查歷史（支援分類/收支/日期區間篩選），跟 summary 共用同一套 <code>ledger.Summarize</code> 分類小計邏輯；每筆記錄可就地編輯（<code>PUT /liff/entries/{id}</code>，只改 amount/category/note，createdAt 不變）或刪除（<code>DELETE /liff/entries/{id}</code>）</li>
+        <li><code>/settings</code> 是訂閱設定頁面，勾選每日／每週／每月（可複選），<code>GET</code>/<code>POST /liff/settings</code> 讀寫 Firestore <code>users/{lineUserId}.subscriptions</code></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>③ 每日總結流程</h3>
+      <ul>
+        <li>Cloud Scheduler 每日固定時間呼叫 <code>services/summary</code> 的 <code>/run</code>（唯一的排程，週/月不是另外的 Scheduler job）</li>
+        <li>沒有 webhook event、沒有 reply token，靠 <code>base.New</code> 已初始化好的 client 直接動作</li>
+        <li>每次都跑「每日」；週一額外跑「每週」（上週一到週日）、每月 1 號額外跑「每月」（上個月整月），各自查 <code>store.ListSubscribers(frequency)</code> 找出訂閱該頻率的所有使用者</li>
+        <li>對每個訂閱者各自查 Firestore 該區間的記帳資料，<code>ledger.Summarize</code> 按分類算小計，各自 Push 一則訊息——多人、多頻率都是同一支 <code>/run</code> 處理，沒有寫死的收件人</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>CI/CD</h3>
+      <ul>
+        <li>三服務各自獨立的 GitHub Actions workflow，path filter 只在對應目錄變動時觸發</li>
+        <li>push main 才會部署，PR 只跑 build/test + lint + vulncheck</li>
+        <li>用 Workload Identity Federation 認證，GitHub 不持有任何長期 GCP 金鑰</li>
+        <li>詳細流程見 <code>docs/deployment-sop.md</code></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>成本控管</h3>
+      <ul>
+        <li>三個 Cloud Run 服務都 <code>min-instances=0</code>，無請求時不計費</li>
+        <li>Cloud Scheduler：免費額度每月 3 個 job，一個每日排程綽綽有餘</li>
+        <li>Firestore：Native mode always-free 額度（1GiB / 5萬讀 / 2萬寫 / 2萬刪 每日）</li>
+        <li>Artifact Registry 免費額度只有 0.5GiB，靠 cleanup policy 只留最近幾版 image</li>
+        <li>另設 GCP Budget Alert 防呆</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>資料模型</h3>
+      <ul>
+        <li><code>users/{lineUserId}/entries/{entryId}</code>：amount, category, note, createdAt</li>
+        <li><code>users/{lineUserId}</code>（文件本身）：<code>subscriptions</code>（陣列，值是 <code>daily</code>/<code>weekly</code>/<code>monthly</code> 的任意組合），由 <code>services/liff</code> 的 <code>/settings</code> 頁面寫入，<code>services/summary</code> 用 <code>array-contains</code> 查詢</li>
+        <li>三服務共用同一份 <code>internal/ledger</code>、<code>internal/store</code>，設定則各自從 <code>internal/base</code> 疊加專屬欄位</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>尚未決定 / 待補</h3>
+      <ul>
+        <li>Rich Menu 選單按鈕，目前 LIFF 只能透過連結進入</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>
