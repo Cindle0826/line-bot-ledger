@@ -42,6 +42,21 @@ resource "google_cloud_run_v2_service" "webhook" {
     }
   }
 
+  # CI (.github/workflows/service-ci.yml) deploys new images directly via
+  # `gcloud run deploy` / deploy-cloudrun, out-of-band from Terraform — image
+  # and labels are that pipeline's fields to own, not Terraform's. Without
+  # this, every `terraform apply` would revert the service back to
+  # var.webhook_image's placeholder default, undoing the latest CI deploy.
+  # client/client_version drift the same way (gcloud stamps its own version).
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].labels,
+      client,
+      client_version,
+    ]
+  }
+
   depends_on = [
     google_project_service.apis,
     google_secret_manager_secret_iam_member.webhook_channel_secret,
@@ -90,6 +105,17 @@ resource "google_cloud_run_v2_service" "summary" {
         }
       }
     }
+  }
+
+  # See the comment on google_cloud_run_v2_service.webhook — CI owns image
+  # and labels for this service too.
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].labels,
+      client,
+      client_version,
+    ]
   }
 
   depends_on = [
@@ -149,6 +175,17 @@ resource "google_cloud_run_v2_service" "liff" {
         }
       }
     }
+  }
+
+  # See the comment on google_cloud_run_v2_service.webhook — CI owns image
+  # and labels for this service too.
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].labels,
+      client,
+      client_version,
+    ]
   }
 
   depends_on = [

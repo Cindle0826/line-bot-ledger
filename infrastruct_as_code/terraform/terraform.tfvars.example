@@ -1,3 +1,9 @@
 # Copy to terraform.tfvars (gitignored) and fill in real values.
 
 billing_account = "XXXXXX-XXXXXX-XXXXXX" # gcloud billing accounts list
+
+# services/liff won't start without this (base.RequireEnv exits immediately),
+# which shows up as a Cloud Run deploy failure ("container failed to start
+# and listen on the port"), not an obvious Terraform error. See
+# docs/liff-sop.md for how to get a LIFF ID.
+liff_id = "1234567890-abcdefgh"
