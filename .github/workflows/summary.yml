@@ -10,6 +10,7 @@ on:
       - go.mod
       - go.sum
       - .github/workflows/summary.yml
+      - .github/workflows/service-ci.yml
   pull_request:
     paths:
       - services/summary/**
@@ -18,88 +19,12 @@ on:
       - go.mod
       - go.sum
       - .github/workflows/summary.yml
-
-env:
-  GCP_PROJECT_ID: line-bot-503410
-  GCP_REGION: asia-east1
-  CLOUD_RUN_SERVICE: ledger-summary
-  IMAGE: asia-east1-docker.pkg.dev/line-bot-503410/line-bot-ledger/summary
+      - .github/workflows/service-ci.yml
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test ./...
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.12.2
-
-  vulncheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - run: govulncheck ./...
-
-  deploy:
-    # Only deploy on a real push to main — PRs just get the checks above.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, lint, vulncheck]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # required for Workload Identity Federation
-    steps:
-      - uses: actions/checkout@v4
-
-      # TODO(yihao): same GCP_WORKLOAD_IDENTITY_PROVIDER /
-      # GCP_SERVICE_ACCOUNT_EMAIL secrets as webhook.yml — see the comment
-      # there for what needs to be created in GCP first. One WIF
-      # pool/provider + service account can be shared by both workflows.
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-
-      - uses: docker/setup-buildx-action@v3
-
-      # Cloud Run only runs linux/amd64 images. ubuntu-latest runners are
-      # already amd64, so this needs no QEMU emulation.
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/summary/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ env.IMAGE }}:${{ github.sha }}
-
-      - name: Deploy to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.CLOUD_RUN_SERVICE }}
-          region: ${{ env.GCP_REGION }}
-          project_id: ${{ env.GCP_PROJECT_ID }}
-          image: ${{ env.IMAGE }}:${{ github.sha }}
+  ci:
+    uses: ./.github/workflows/service-ci.yml
+    with:
+      service: summary
+      cloud_run_service: ledger-summary
+    secrets: inherit

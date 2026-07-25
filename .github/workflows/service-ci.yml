@@ -1,0 +1,96 @@
+name: service-ci
+
+# Shared by webhook.yml/summary.yml/liff.yml's `ci` job (workflow_call) — the
+# per-service files own their own path filters and just pass in which
+# service/Cloud Run service to build and deploy.
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: "Directory name under services/ and deploy/ (e.g. webhook)"
+        required: true
+        type: string
+      cloud_run_service:
+        description: "Cloud Run service name (e.g. ledger-webhook)"
+        required: true
+        type: string
+
+env:
+  GCP_PROJECT_ID: line-bot-503410
+  GCP_REGION: asia-east1
+  IMAGE: asia-east1-docker.pkg.dev/line-bot-503410/line-bot-ledger/${{ inputs.service }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: govulncheck ./...
+
+  deploy:
+    # Only deploy on a real push to main — PRs just get the checks above.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, lint, vulncheck]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for Workload Identity Federation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Cloud Run only runs linux/amd64 images. ubuntu-latest runners are
+      # already amd64, so this needs no QEMU emulation.
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/${{ inputs.service }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ inputs.cloud_run_service }}
+          region: ${{ env.GCP_REGION }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          image: ${{ env.IMAGE }}:${{ github.sha }}
